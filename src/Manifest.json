@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "My Extension",
+  "name": "Ub Auto Lead",
   "version": "1.0.0",
   "description": "A modular Chrome extension.",
   "background": {

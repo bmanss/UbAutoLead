@@ -1,7 +1,16 @@
+// TODO:
+//  1. try remove the TryGetElementByClass in favor of query
+//  2. change element identifiers to account for query type 
+//  3. Get device info
+//  4. Add lead messages
+//  5. Determine lead message based on company and device type
+//  6. Send message on avail communcations
+//  7. Handle invalid communication errors
+//  8. Other
+
 Main();
 
 function Main() {
-  console.log(Constants.APP_NAME);
   let lastUrl = location.href;
 
   // Run on initial load
@@ -18,7 +27,7 @@ function Main() {
 }
 
 function InjectQuickLeadButton() {
-  const apptEl = document.querySelector('.appointment');
+  const apptEl = document.querySelector(`.${ELEMENT_IDENTIFIERS.APPOINTMENT}`);
   if (!apptEl) return;
 
   const btn = document.createElement("button");
@@ -30,21 +39,20 @@ function InjectQuickLeadButton() {
 
 async function AutoCompleteLead() {
   console.log("Auto completing lead...");
-  EnableCommunication();
-
+  // EnableCommunication();
+  const customerInfo = ParseCustomerInfo();
+  console.log(customerInfo.company);
   try {
     const toastEl = await WaitForElement("#toast-container");
     const toastMessageEl = TryQuerySelector(toastEl,`.toast-message`)
     if (toastMessageEl.Success){
 
       const message = toastMessageEl.Element.textContent;
-      if (message == Constants.TOAST_MESSAGES.CUSTOMER_UPDATED){
+      if (message == ELEMENT_IDENTIFIERS.TOAST_MESSAGES.CUSTOMER_UPDATED){
         console.log("Communcations updated");
       }
 
     } 
-    
-    // do something with toastEl
   } catch (e) {
     console.log("Toast never appeared:", e);
   }
@@ -64,25 +72,4 @@ async function OnPageChange() {
   } catch (e) {
     console.log("Failed to find appointment element:", e);
   }
-}
-
-function WaitForElement(selector, timeout = 10000) {
-  return new Promise((resolve, reject) => {
-    const el = document.querySelector(selector);
-    if (el) return resolve(el);
-
-    const observer = new MutationObserver(() => {
-      const el = document.querySelector(selector);
-      if (el) {
-        observer.disconnect();
-        resolve(el);
-      }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-    setTimeout(() => {
-      observer.disconnect();
-      reject("Timed out waiting for " + selector);
-    }, timeout);
-  });
 }

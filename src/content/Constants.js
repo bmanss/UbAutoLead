@@ -1,5 +1,5 @@
-const Constants = {
-  APP_NAME: "Ubif Quick Lead",
+const ELEMENT_IDENTIFIERS = {
+  APPOINTMENT: "appointment",
   LEADS_URL_PATH: "lead-management/leads/edit",
   CUSTOMER_DETAILS: "editable-details",
   CUSTOMER_CONTACT_PREFS_CLASS: "col-xs-12 contact-details",
@@ -29,5 +29,25 @@ const Constants = {
   NOTE_TEXTAREA: "note-editable",
   TOAST_MESSAGES:{
     CUSTOMER_UPDATED: "Customer Updated"
-  }
+  },
+  
 };
+
+const DEVICE_KEYWORD =  {
+    Iphone: "iPhone",
+    Samsung: "Samsung",
+    Google: "Google",
+};
+
+const COMPANIES = {
+  AsurionMobility: "Asurion Mobility",
+  HomePlus: "Asurion Home+ Repairs",
+  RemoteTech: "Asurion Remote Tech",
+  Verizon: "Verizon Extended Warranty",
+  None: "N/A",
+};
+
+const LEAD_MESSAGE = {
+    [COMPANIES.AsurionMobility] : "tt",
+}
+
