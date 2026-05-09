@@ -63,6 +63,35 @@ const LEAD_MESSAGE = {
       Default: `Hi, this is uBreakiFix. We have your insurance claim! You will need to be at your repair location for the entirety of your repair window until it has been completed.`,
       [DEVICE_KEYWORD.Iphone]: `Hi, this is uBreakiFix. We have your insurance claim! You will need to be at your repair location for the entirety of your repair window until your repair has been completed. Please remember to turn off the setting "Find my iphone".`
     },
-    
+
 }
 
+
+// --- CLAIMS ----
+// -IPhone
+// Hi! This is UBreakiFix. We have your insurance claim. Please turn off the setting "Find my iPhone". Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time  is 4pm Mon-Sat. 
+
+// -Sammy
+// Hi, this is UBreakiFix. We have your insurance claim and are ready to begin the repair! Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time is 4pm Mon-Sat. 
+
+// -ATC/Home+ 
+// Hi, this is UBreakiFix. We have your insurance claim and are ready to begin the repair! The repair for your Device takes about 5 to 7 days, please make sure to back up any data if possible. 
+
+// --- REMOTE ---
+// -IPhone 
+// Hi, this is uBreakiFix. We have your insurance claim! You will need to be at your repair location for the entirety of your repair window until your repair has been completed. Please remember to turn off the setting "Find my iphone". 
+
+// -Other
+// Hi, this is uBreakiFix. We have your insurance claim! You will need to be at your repair location for the entirety of your repair window until it has been completed. 
+
+// --- MISSED ---
+// Hello, this is Ubreakifix. We noticed you have missed the appointment for your device. Please contact us at 803-520-8285 at your earliest convenience to reschedule your appointment.  
+
+// --- NEW ---
+// Hello, this is UBreakiFix. We see that we have an appointment for your device. We have just a few questions about your device. If possible, contact us at your earliest convenience at [store_phone]. 
+
+// --- Questions ---
+// Hi this is UBreakiFix. Please give us a call about your device at your earliest convenience at [store_phone].
+
+// --- Quote --- 
+// Hello, this is UBreakiFix. We have an appointment for your device. The quote for this repair is $price before tax. Be sure to stop by or give us a call at your earliest convenience so we can reserve or order parts for you. 
