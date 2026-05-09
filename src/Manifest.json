@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "My Extension",
+  "version": "1.0.0",
+  "description": "A modular Chrome extension.",
+  "background": {
+    "service_worker": "background/Main.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://portal.ubif.net/*"],
+      "css": ["style/Main.css"],
+      "js": [
+        "content/Constants.js",
+        "content/Helper.js",
+        "content/Main.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": []
+}
