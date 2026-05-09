@@ -1,7 +1,7 @@
 // TODO:
 //  1. try remove the TryGetElementByClass in favor of query
 //  2. change element identifiers to account for query type 
-//  3. Get device info
+//  3. Get device info ***DONE***
 //  4. Add lead messages
 //  5. Determine lead message based on company and device type
 //  6. Send message on avail communcations
@@ -32,32 +32,32 @@ function InjectQuickLeadButton() {
 
   const btn = document.createElement("button");
   btn.className = "Quick-Lead-Button";
-  btn.textContent = "Quick Lead";
+  btn.textContent = "Auto Lead";
   btn.addEventListener("click", AutoCompleteLead);
   apptEl.insertAdjacentElement("afterend", btn);
 }
 
 async function AutoCompleteLead() {
   console.log("Auto completing lead...");
-  // EnableCommunication();
+  EnableCommunication();
   const customerInfo = ParseCustomerInfo();
-  console.log(customerInfo.company);
-  try {
-    const toastEl = await WaitForElement("#toast-container");
-    const toastMessageEl = TryQuerySelector(toastEl,`.toast-message`)
-    if (toastMessageEl.Success){
+  const deviceType = await GetDeviceType();
+  console.log(deviceType);
+  const toastEl = await WaitForElement("#toast-container");
 
-      const message = toastMessageEl.Element.textContent;
-      if (message == ELEMENT_IDENTIFIERS.TOAST_MESSAGES.CUSTOMER_UPDATED){
-        console.log("Communcations updated");
-      }
+  if (!toastEl) {
+    console.log("Toast never appeared");
+    return;
+  }
+  const toastMessageEl = TryQuerySelector(toastEl, `.toast-message`)
+  if (toastMessageEl.Success) {
 
-    } 
-  } catch (e) {
-    console.log("Toast never appeared:", e);
+    const message = toastMessageEl.Element.textContent;
+    if (message == ELEMENT_IDENTIFIERS.TOAST_MESSAGES.CUSTOMER_UPDATED) {
+      console.log("Communcations updated");
+    }
   }
 }
-
 async function OnPageChange() {
   if (!location.href.includes("lead-management/leads/edit")) {
     console.log("not on a lead page");
