@@ -17,8 +17,11 @@ function Main() {
 }
 
 function InjectQuickLeadButton() {
-  const apptEl = document.querySelector(`${ELEMENT_IDENTIFIERS.APPOINTMENT}`);
+  const apptEl = document.querySelector(ELEMENT_IDENTIFIERS.APPOINTMENT);
   if (!apptEl) return;
+
+  // Don't inject if already there
+  if (document.querySelector(".Quick-Lead-Button")) return;
 
   const btn = document.createElement("button");
   btn.className = "Quick-Lead-Button";
@@ -26,26 +29,22 @@ function InjectQuickLeadButton() {
   btn.addEventListener("click", AutoCompleteLead);
   apptEl.insertAdjacentElement("afterend", btn);
 }
-
 async function AutoCompleteLead() {
-  EnableCommunication();
+  await EnableCommunication();
 
   const company = ParseCustomerInfo().company;
   const deviceType = await GetDeviceType();
 
-  CreateLeadNote(deviceType, company);
+  await CreateLeadNote(deviceType, company);
 
   const toastEl = await WaitForElement("#toast-container");
+  if (!toastEl) return;
 
-  if (!toastEl) {
-    // console.log("Toast never appeared");
-    return;
-  }
-  const toastMessageEl = TryQuerySelector(toastEl, `.toast-message`);
+  const toastMessageEl = TryQuerySelector(toastEl, ".toast-message");
   if (toastMessageEl.Success) {
     const message = toastMessageEl.Element.textContent;
     if (message == ELEMENT_IDENTIFIERS.TOAST_MESSAGES.CUSTOMER_UPDATED) {
-      // console.log("Communcations updated");
+      // console.log("Communications updated");
     }
   }
 }

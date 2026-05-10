@@ -21,18 +21,22 @@ function ParseCustomerInfo() {
 
 async function EnableCommunication(enableSMS = true, enableEmail = true) {
   ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
-  let cxDetailsEl = TryQuerySelector(document, ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
 
-  if (!cxDetailsEl.Success) {
+  // Wait for the panel to actually open instead of querying immediately
+  let cxDetailsEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
+
+  if (!cxDetailsEl) {
+    // Try toggling again
     ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
-    cxDetailsEl = TryQuerySelector(document, ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
-    if (!cxDetailsEl.Success) return;
+    cxDetailsEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
+    if (!cxDetailsEl) return;
   }
 
-  const prefCommEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_CONTACT_PREFS_CLASS, cxDetailsEl.Element);
+  const prefCommEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_CONTACT_PREFS_CLASS, cxDetailsEl);
   if (!prefCommEl) return;
 
-  const saveBtn = TryQuerySelector(cxDetailsEl.Element, ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS_SAVE_BTN_CLASS).Element;
+  const saveBtn = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS_SAVE_BTN_CLASS, cxDetailsEl);
+  if (!saveBtn) return;
 
   const smsCheckBox = TryQuerySelector(prefCommEl, `[name="${ELEMENT_IDENTIFIERS.CUSTOMER_CONTACT_PREF_NAMES.Sms}"]`);
   const emailCheckBox = TryQuerySelector(prefCommEl, `[name="${ELEMENT_IDENTIFIERS.CUSTOMER_CONTACT_PREF_NAMES.Email}"]`);
@@ -48,19 +52,21 @@ async function EnableCommunication(enableSMS = true, enableEmail = true) {
   }
 
   saveBtn.click();
-  ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
+  // ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
 }
 
-function ToggleSidePanel(panelType) {
-  const sidePanelEl = TryQuerySelector(document, ELEMENT_IDENTIFIERS.SIDE_BUTTONS_PANEL);
+async function ToggleSidePanel(panelType) {
+  const sidePanelEl = await WaitForElement(ELEMENT_IDENTIFIERS.SIDE_BUTTONS_PANEL);
+  if (!sidePanelEl) return;
+
   const panelTypeValid = Object.keys(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS_CLASS).includes(panelType);
   const sideBtnClass = ELEMENT_IDENTIFIERS.SIDE_BUTTIONS_CLASS[panelType];
 
-  if (sidePanelEl.Success && panelTypeValid) {
-    const sideButtonEl = TryQuerySelector(sidePanelEl.Element, sideBtnClass);
+  if (!panelTypeValid) return;
 
-    if (sideButtonEl.Success) sideButtonEl.Element.click();
-  }
+  const sideButtonEl = TryQuerySelector(sidePanelEl, sideBtnClass);
+
+  if (sideButtonEl.Success) sideButtonEl.Element.click();
 }
 
 async function GetDeviceType() {
@@ -114,8 +120,10 @@ function GetDeviceTypeWithKeywords(itemText) {
 }
 function GetLeadMessage(deviceType, company, leadStatus) {
   const companyLeads = LEAD_MESSAGE[company];
-  if (!companyLeads) return "";
-
+  if (!companyLeads){
+    console.log(`Company:${company} has no valid lead messages`);
+    return "";
+  }
   let message = "";
 
   // unknown company
@@ -133,7 +141,7 @@ function GetLeadMessage(deviceType, company, leadStatus) {
     }
   }
   // known company lead awaiting contact
-  else if (leadStatus == LEAD_STATUS.NeedContact) {
+  else if (leadStatus === LEAD_STATUS.NeedContact) {
     message = companyLeads[deviceType] ?? companyLeads.Default;
   }
 
@@ -142,7 +150,10 @@ function GetLeadMessage(deviceType, company, leadStatus) {
 
 function GetLeadStatus(noteContainer) {
   const leadStatusEl = noteContainer.querySelector("select");
-  if (!leadStatusEl) return "";
+  if (!leadStatusEl){
+    console.log(`unable to get lead status element`);
+    return "";
+  }
 
   const selectedOption = leadStatusEl.options[leadStatusEl.selectedIndex];
   const statusText = selectedOption?.textContent?.trim() ?? "";
@@ -164,28 +175,35 @@ function SetLeadStatus(noteContainer, statusName) {
 }
 async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
-  let notesEl = TryQuerySelector(document, ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
 
-  if (!notesEl.Success) {
+  // Wait for notes panel to actually appear
+  let notesEl = await WaitForElement(ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
+
+  if (!notesEl) {
     ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
-    notesEl = TryQuerySelector(document, ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
-    if (!notesEl.Success) return;
+    notesEl = await WaitForElement(ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
+    if (!notesEl){
+      console.log("unable to create note, could not find elements");
+    }
   }
 
-  const leadStatus = GetLeadStatus(notesEl.Element);
+  const leadStatus = GetLeadStatus(notesEl);
   const leadMessage = GetLeadMessage(deviceType, company, leadStatus);
 
-  const createNoteContainer = notesEl.Element.querySelector(ELEMENT_IDENTIFIERS.NOTE_CONFRIM_ROW_CLASS);
+  const createNoteContainer = notesEl.querySelector(ELEMENT_IDENTIFIERS.NOTE_CONFRIM_ROW_CLASS);
   const createNoteBtn = createNoteContainer.querySelector(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`);
 
-  const noteSmsButton = notesEl.Element.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`);
-  const noteEmailButton = notesEl.Element.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`);
-  const noteEditableArea = notesEl.Element.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_TEXTAREA}"]`);
+  const noteSmsButton = notesEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`);
+  const noteEmailButton = notesEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`);
 
-  // only send valid leads message
-  if (!leadMessage) return;
+  if (!leadMessage){
+    console.log("unable to create note, no valid message");
+    console.log(`status:${leadStatus}, device:${deviceType}. company:${company}`)
 
-  SetLeadStatus(notesEl.Element, LEAD_STATUS.AwaitingCustomer);
+    return;
+  }
+
+  SetLeadStatus(notesEl, LEAD_STATUS.AwaitingCustomer);
 
   if (sms && noteSmsButton) {
     noteSmsButton.click();
@@ -194,7 +212,6 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
     createNoteBtn.disabled = false;
     createNoteBtn.click();
 
-    // wait for create note button to disable to make sure the note sent
     await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
   }
 
