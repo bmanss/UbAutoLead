@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Ub Auto Lead",
   "version": "1.0.0",
-  "description": "A modular Chrome extension.",
+  "description": "Auto send contact messages for leads.",
   "background": {
     "service_worker": "background/Main.js",
     "type": "module"
