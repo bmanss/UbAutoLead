@@ -55,6 +55,7 @@ const COMPANIES = {
   AsurionMobility: "Asurion Mobility",
   HomePlus: "Asurion Home+ Repairs",
   RemoteTech: "Asurion Remote Tech",
+  Servify: "Servify Samsung Care+",
   Verizon: "Verizon Extended Warranty",
   None: "N/A",
 };
@@ -70,6 +71,9 @@ const LEAD_MESSAGE = {
   [COMPANIES.RemoteTech]: {
     Default: `Hi, this is uBreakiFix. We have your insurance claim! You will need to be at your repair location for the entirety of your repair window until it has been completed.`,
     [DEVICE_KEYWORD.Iphone]: `Hi, this is uBreakiFix. We have your insurance claim! You will need to be at your repair location for the entirety of your repair window until your repair has been completed. Please remember to turn off the setting "Find my iphone".`,
+  },
+  [COMPANIES.Servify]: {
+    Default: `Hello, this is UBreakiFix. We see that we have an appointment for your device. We have a few questions about your device. If possible, contact us at your earliest convenience at 803-520-8285.`,
   },
   [COMPANIES.Verizon]: {
     Default: `Hi, this is UBreakiFix. We have your Verizon extended warranty claim! We have all the parts we need and are ready to begin your repair. Phone repairs “usually” take about 3 hours to complete. Same day cut off time is 4pm Mon-Sat.`,

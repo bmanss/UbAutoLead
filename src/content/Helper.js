@@ -122,7 +122,7 @@ function GetLeadMessage(deviceType, company, leadStatus) {
   let message = "";
   const companyLeads = LEAD_MESSAGE[company];
 
-  if (!companyLeads){
+  if (!companyLeads) {
     console.log(`Company:${company} has no valid lead messages`);
     return message;
   }
@@ -200,8 +200,8 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
     return;
   }
 
-  const createNoteContainer = notesEl.querySelector(ELEMENT_IDENTIFIERS.NOTE_CONFRIM_ROW_CLASS);
-  const createNoteBtn = createNoteContainer.querySelector(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`);
+  const createNoteContainer = await WaitForElement(ELEMENT_IDENTIFIERS.NOTE_CONFRIM_ROW_CLASS, notesEl, 2000);
+  const createNoteBtn = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`, createNoteContainer, 2000);
 
   // Wait for diag-hold (sms/email button container) to be ready
   const diagHoldEl = await WaitForElement(".diag-hold", notesEl);
@@ -210,9 +210,23 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
     return;
   }
 
-  const noteSmsButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`);
-  const noteEmailButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`);
+  if (!createNoteBtn) {
+    console.log("create note button not found");
+    return;
+  }
 
+  // const noteSmsButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`);
+  // const noteEmailButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`);
+
+  const noteSmsButton = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`, diagHoldEl, 1000);
+  const noteEmailButton = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`, diagHoldEl, 1000);
+
+  if (!noteSmsButton) {
+    console.log(`sms button note found`);
+  }
+  if (!noteEmailButton) {
+    console.log(`sms button note found`);
+  }
   SetLeadStatus(notesEl, LEAD_STATUS.AwaitingCustomer);
 
   if (sms && noteSmsButton) {
@@ -221,8 +235,10 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
 
     createNoteBtn.disabled = false;
     createNoteBtn.click();
-
+    console.log(`sms button clicked`);
     await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
+    console.log(`create note disabled`);
+
   }
 
   if (email && noteEmailButton) {
@@ -231,6 +247,8 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
 
     createNoteBtn.disabled = false;
     createNoteBtn.click();
+    console.log(`email button clicked`);
+
   }
 
   ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
@@ -238,11 +256,13 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
 
 async function SetMessageModalText(text) {
   const modalEl = await WaitForElement(ELEMENT_IDENTIFIERS.NOTE_CONTACT_MODAL_ID);
-  const messageArea = modalEl.querySelector("textarea");
-  const confirmBtn = modalEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`);
+  const messageArea = await WaitForElement("textarea", modalEl, 1000);
+  const confirmBtn = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`, modalEl, 1000);
   messageArea.value = text;
   messageArea.dispatchEvent(new Event("input", { bubbles: true }));
+  confirmBtn.disabled = false;
   confirmBtn.click();
+  console.log(`modal text set and confirmed with:${text}`);
 }
 
 function TryQuerySelector(parent, selector) {
