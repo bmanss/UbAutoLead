@@ -30,8 +30,9 @@ function InjectQuickLeadButton() {
   apptEl.insertAdjacentElement("afterend", btn);
 }
 async function AutoCompleteLead() {
+  console.log(`Auto complete initiated`);
   await EnableCommunication();
-
+  
   const company = ParseCustomerInfo().company;
   const deviceType = await GetDeviceType();
 

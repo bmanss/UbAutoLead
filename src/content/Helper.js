@@ -119,12 +119,13 @@ function GetDeviceTypeWithKeywords(itemText) {
   return "";
 }
 function GetLeadMessage(deviceType, company, leadStatus) {
+  let message = "";
   const companyLeads = LEAD_MESSAGE[company];
+
   if (!companyLeads){
     console.log(`Company:${company} has no valid lead messages`);
-    return "";
+    return message;
   }
-  let message = "";
 
   // unknown company
   if (company === COMPANIES.None) {
@@ -148,18 +149,20 @@ function GetLeadMessage(deviceType, company, leadStatus) {
   return message;
 }
 
-function GetLeadStatus(noteContainer) {
-  const leadStatusEl = noteContainer.querySelector("select");
-  if (!leadStatusEl){
-    console.log(`unable to get lead status element`);
-    return "";
-  }
+async function GetLeadStatus(noteContainer) {
+  const leadStatusEl = await WaitForElement("select", noteContainer);
+  if (!leadStatusEl) return "";
+
+  // Wait until an option is actually selected with valid text
+  await WaitForElementChange(leadStatusEl, (el) => {
+    const opt = el.options[el.selectedIndex];
+    return opt && opt.textContent.trim().length > 0;
+  });
 
   const selectedOption = leadStatusEl.options[leadStatusEl.selectedIndex];
-  const statusText = selectedOption?.textContent?.trim() ?? "";
-
-  return statusText;
+  return selectedOption?.textContent?.trim() ?? "";
 }
+
 function SetLeadStatus(noteContainer, statusName) {
   const selectEl = noteContainer.querySelector("select");
   if (!selectEl) return false;
@@ -182,26 +185,33 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   if (!notesEl) {
     ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
     notesEl = await WaitForElement(ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
-    if (!notesEl){
+    if (!notesEl) {
       console.log("unable to create note, could not find elements");
+      return;
     }
   }
 
-  const leadStatus = GetLeadStatus(notesEl);
+  const leadStatus = await GetLeadStatus(notesEl);
   const leadMessage = GetLeadMessage(deviceType, company, leadStatus);
+
+  if (!leadMessage) {
+    console.log("unable to create note, no valid message");
+    console.log(`status:${leadStatus}, device:${deviceType}, company:${company}`);
+    return;
+  }
 
   const createNoteContainer = notesEl.querySelector(ELEMENT_IDENTIFIERS.NOTE_CONFRIM_ROW_CLASS);
   const createNoteBtn = createNoteContainer.querySelector(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`);
 
-  const noteSmsButton = notesEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`);
-  const noteEmailButton = notesEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`);
-
-  if (!leadMessage){
-    console.log("unable to create note, no valid message");
-    console.log(`status:${leadStatus}, device:${deviceType}. company:${company}`)
-
+  // Wait for diag-hold (sms/email button container) to be ready
+  const diagHoldEl = await WaitForElement(".diag-hold", notesEl);
+  if (!diagHoldEl) {
+    console.log("unable to create note, diag-hold not found");
     return;
   }
+
+  const noteSmsButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`);
+  const noteEmailButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`);
 
   SetLeadStatus(notesEl, LEAD_STATUS.AwaitingCustomer);
 
