@@ -1,6 +1,7 @@
 const ELEMENT_IDENTIFIERS = {
   APPOINTMENT: ".appointment",
   LEADS_URL_PATH: "lead-management/leads/edit",
+  LOADING_BAR: "#loading-bar",
   CUSTOMER_DETAILS: ".editable-details",
   CUSTOMER_DEVICE_CLASS: ".device-customer",
   DEVICE_DETAIL_ITEM_CLASS: ".device-detail",
@@ -34,9 +35,6 @@ const ELEMENT_IDENTIFIERS = {
   CONFIRM_BTN_CLASS: "btn-confirm",
   NOTE_SMS_BTN_CLASS: "lead-create-sms-btn",
   NOTE_EMAIL_BTN_CLASS: "lead-create-email-btn",
-  TOAST_MESSAGES: {
-    CUSTOMER_UPDATED: "Customer Updated",
-  },
 };
 const LEAD_STATUS = {
   AwaitingCustomer: "Awaiting Customer",
