@@ -1,11 +1,3 @@
-function GenerateLeadData() {
-  const customerInfoElement = TryQuerySelector(document, ".customer");
-  if (customerInfoElement.Success) {
-    console.log(ParseCustomerInfo(customerInfoElement.Element));
-    EnableCommunication();
-  }
-}
-
 function ParseCustomerInfo() {
   const [nameEl, phoneEl, emailEl] = document.getElementsByClassName("customer-detail");
   const companyEl = TryQuerySelector(document, ".company.customer-detail");
@@ -20,14 +12,13 @@ function ParseCustomerInfo() {
 }
 
 async function EnableCommunication(enableSMS = true, enableEmail = true) {
-  ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
+  await ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
 
-  // Wait for the panel to actually open instead of querying immediately
   let cxDetailsEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
 
   if (!cxDetailsEl) {
     // Try toggling again
-    ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
+    await ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
     cxDetailsEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
     if (!cxDetailsEl) return;
   }
@@ -179,6 +170,8 @@ function SetLeadStatus(noteContainer, statusName) {
 async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
 
+  const leadSent = { sms: false, email: false };
+
   // Wait for notes panel to actually appear
   let notesEl = await WaitForElement(ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
 
@@ -187,7 +180,7 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
     notesEl = await WaitForElement(ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
     if (!notesEl) {
       console.log("unable to create note, could not find elements");
-      return;
+      return leadSent;
     }
   }
 
@@ -197,7 +190,7 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   if (!leadMessage) {
     console.log("unable to create note, no valid message");
     console.log(`status:${leadStatus}, device:${deviceType}, company:${company}`);
-    return;
+    return leadSent;
   }
 
   const createNoteContainer = await WaitForElement(ELEMENT_IDENTIFIERS.NOTE_CONFRIM_ROW_CLASS, notesEl, 2000);
@@ -207,16 +200,13 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   const diagHoldEl = await WaitForElement(".diag-hold", notesEl);
   if (!diagHoldEl) {
     console.log("unable to create note, diag-hold not found");
-    return;
+    return leadSent;
   }
 
   if (!createNoteBtn) {
     console.log("create note button not found");
-    return;
+    return leadSent;
   }
-
-  // const noteSmsButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`);
-  // const noteEmailButton = diagHoldEl.querySelector(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`);
 
   const noteSmsButton = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`, diagHoldEl, 1000);
   const noteEmailButton = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`, diagHoldEl, 1000);
@@ -227,6 +217,7 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   if (!noteEmailButton) {
     console.log(`sms button note found`);
   }
+
   SetLeadStatus(notesEl, LEAD_STATUS.AwaitingCustomer);
 
   if (sms && noteSmsButton) {
@@ -235,10 +226,8 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
 
     createNoteBtn.disabled = false;
     createNoteBtn.click();
-    console.log(`sms button clicked`);
     await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
-    console.log(`create note disabled`);
-
+    leadSent.sms = true;
   }
 
   if (email && noteEmailButton) {
@@ -247,11 +236,11 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
 
     createNoteBtn.disabled = false;
     createNoteBtn.click();
-    console.log(`email button clicked`);
-
+    leadSent.email = true;
   }
 
-  ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
+  await ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
+  return leadSent;
 }
 
 async function SetMessageModalText(text) {
@@ -262,7 +251,6 @@ async function SetMessageModalText(text) {
   messageArea.dispatchEvent(new Event("input", { bubbles: true }));
   confirmBtn.disabled = false;
   confirmBtn.click();
-  console.log(`modal text set and confirmed with:${text}`);
 }
 
 function TryQuerySelector(parent, selector) {
@@ -270,7 +258,7 @@ function TryQuerySelector(parent, selector) {
   return { Success: element != null, Element: element };
 }
 
-function WaitForElement(selector, parent = document, timeout = 10000) {
+function WaitForElement(selector, parent = document, timeout = 5000) {
   return new Promise((resolve) => {
     const el = parent.querySelector(selector);
     if (el) return resolve(el);
@@ -290,9 +278,8 @@ function WaitForElement(selector, parent = document, timeout = 10000) {
     }, timeout);
   });
 }
-function WaitForElementChange(element, checkFn, timeout = 10000) {
+function WaitForElementChange(element, checkFn, timeout = 5000) {
   return new Promise((resolve) => {
-    // Check immediately
     if (checkFn(element)) return resolve(element);
 
     const observer = new MutationObserver(() => {
@@ -316,22 +303,19 @@ function WaitForElementChange(element, checkFn, timeout = 10000) {
   });
 }
 
-function WaitForElementRemoved(selector, parent = document, timeout = 10000) {
+function WaitForElementRemoved(element, timeout = 5000) {
   return new Promise((resolve) => {
-    // Already gone
-    if (!parent.querySelector(selector)) return resolve(true);
+    if (!element || !element.isConnected) return resolve(true);
 
     const observer = new MutationObserver(() => {
-      if (!parent.querySelector(selector)) {
+      if (!element.isConnected) {
         observer.disconnect();
         resolve(true);
       }
     });
 
-    observer.observe(parent === document ? document.body : parent, {
-      childList: true,
-      subtree: true,
-    });
+    const target = element.parentNode ?? document.body;
+    observer.observe(target, { childList: true, subtree: true });
 
     setTimeout(() => {
       observer.disconnect();
