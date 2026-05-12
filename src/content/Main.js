@@ -30,35 +30,29 @@ function InjectQuickLeadButton() {
   apptEl.insertAdjacentElement("afterend", btn);
 }
 async function AutoCompleteLead() {
+  // wait for page initial load;
+  const loadingBar = await WaitForElement(ELEMENT_IDENTIFIERS.LOADING_BAR, document, 250);
+
+  if (loadingBar) {
+    console.log("Waiting for initial load");
+    await WaitForElementRemoved(loadingBar);
+  }
+
   console.log(`Auto complete initiated`);
   await EnableCommunication();
-  
+
   const company = ParseCustomerInfo().company;
   const deviceType = await GetDeviceType();
 
-  await CreateLeadNote(deviceType, company);
-
-  const toastEl = await WaitForElement("#toast-container");
-  if (!toastEl) return;
-
-  const toastMessageEl = TryQuerySelector(toastEl, ".toast-message");
-  if (toastMessageEl.Success) {
-    const message = toastMessageEl.Element.textContent;
-    if (message == ELEMENT_IDENTIFIERS.TOAST_MESSAGES.CUSTOMER_UPDATED) {
-      // console.log("Communications updated");
-    }
-  }
+  const leadSent = await CreateLeadNote(deviceType, company);
+  console.log(`Auto complete finished. Sms sent:${leadSent.sms}, email sent:${leadSent.email}`);
 }
 async function OnPageChange() {
   if (!location.href.includes("lead-management/leads/edit")) {
-    // console.log("not on a lead page");
     return;
   }
-
-  // console.log("Page changed:", location.href);
-
   try {
-    await WaitForElement(".appointment");
+    await WaitForElement(ELEMENT_IDENTIFIERS.APPOINTMENT);
     InjectQuickLeadButton();
   } catch (e) {
     console.log("Failed to find appointment element:", e);
