@@ -1,5 +1,7 @@
 Main();
 
+let autoCompleteInProgress = false;
+
 function Main() {
   let lastUrl = location.href;
 
@@ -30,6 +32,10 @@ function InjectQuickLeadButton() {
   apptEl.insertAdjacentElement("afterend", btn);
 }
 async function AutoCompleteLead() {
+  if (autoCompleteInProgress) return;
+
+  autoCompleteInProgress = true;
+  
   // wait for page initial load;
   const loadingBar = await WaitForElement(ELEMENT_IDENTIFIERS.LOADING_BAR, document, 250);
 
@@ -46,6 +52,7 @@ async function AutoCompleteLead() {
 
   const leadSent = await CreateLeadNote(deviceType, company);
   console.log(`Auto complete finished. Sms sent:${leadSent.sms}, email sent:${leadSent.email}`);
+  autoCompleteInProgress = false;
 }
 async function OnPageChange() {
   if (!location.href.includes("lead-management/leads/edit")) {
