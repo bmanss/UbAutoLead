@@ -111,11 +111,11 @@ function GetDeviceTypeWithKeywords(itemText) {
 }
 function GetLeadMessage(deviceType, company, leadStatus) {
   let message = "";
-  const companyLeads = LEAD_MESSAGE[company];
+  let companyLeads = LEAD_MESSAGE[company];
 
   if (!companyLeads) {
     console.log(`Company:${company} has no valid lead messages`);
-    return message;
+    companyLeads = COMPANIES.None;
   }
 
   // unknown company
@@ -137,7 +137,7 @@ function GetLeadMessage(deviceType, company, leadStatus) {
     message = companyLeads[deviceType] ?? companyLeads.Default;
   }
 
-  return message;
+  return "";
 }
 
 async function GetLeadStatus(noteContainer) {
