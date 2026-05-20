@@ -114,11 +114,11 @@ function GetLeadMessage(deviceType, company, leadStatus) {
   let companyLeads = LEAD_MESSAGE[company];
 
   if (!companyLeads) {
-    console.log(`Company:${company} has no valid lead messages`);
-    companyLeads = COMPANIES.None;
+    console.log(`Company:${company} has no valid lead messages, defaulting to no company.`);
+    companyLeads = LEAD_MESSAGE[COMPANIES.None];
   }
 
-  // unknown company
+  // No company
   if (company === COMPANIES.None) {
     switch (leadStatus) {
       case LEAD_STATUS.NeedContact:
@@ -132,7 +132,7 @@ function GetLeadMessage(deviceType, company, leadStatus) {
         break;
     }
   }
-  // known company lead awaiting contact
+  // Company lead awaiting contact
   else if (leadStatus === LEAD_STATUS.NeedContact) {
     message = companyLeads[deviceType] ?? companyLeads.Default;
   }
