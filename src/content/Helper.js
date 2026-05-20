@@ -137,7 +137,7 @@ function GetLeadMessage(deviceType, company, leadStatus) {
     message = companyLeads[deviceType] ?? companyLeads.Default;
   }
 
-  return "";
+  return message;
 }
 
 async function GetLeadStatus(noteContainer) {
