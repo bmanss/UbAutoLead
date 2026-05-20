@@ -51,6 +51,7 @@ const DEVICE_KEYWORD = {
 
 const COMPANIES = {
   AsurionMobility: "Asurion Mobility",
+  GooglePreferred: "Google Preferred Care",
   HomePlus: "Asurion Home+ Repairs",
   RemoteTech: "Asurion Remote Tech",
   Servify: "Servify Samsung Care+",
@@ -62,6 +63,9 @@ const LEAD_MESSAGE = {
   [COMPANIES.AsurionMobility]: {
     Default: `Hi, this is UBreakiFix. We have your insurance claim and are ready to begin the repair! Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time is 4pm Mon-Sat. `,
     [DEVICE_KEYWORD.Iphone]: `Hi! This is UBreakiFix. We have your insurance claim. Please turn off the setting "Find my iPhone". Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time  is 4pm Mon-Sat.`,
+  },
+  [COMPANIES.GooglePreferred]: {
+    Default: `Hi, this is UBreakiFix. We have your insurance claim and are ready to begin the repair! Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time is 4pm Mon-Sat.`,
   },
   [COMPANIES.HomePlus]: {
     Default: `Hi, this is UBreakiFix. We have your insurance claim and are ready to begin the repair! The repair for your Device takes about 5 to 7 days, please make sure to back up any data if possible.`,
