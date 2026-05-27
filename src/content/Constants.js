@@ -51,6 +51,7 @@ const DEVICE_KEYWORD = {
 
 const COMPANIES = {
   AsurionMobility: "Asurion Mobility",
+  AsurionAmazon: "Asurion Amazon",
   GooglePreferred: "Google Preferred Care",
   HomePlus: "Asurion Home+ Repairs",
   RemoteTech: "Asurion Remote Tech",
@@ -63,6 +64,9 @@ const LEAD_MESSAGE = {
   [COMPANIES.AsurionMobility]: {
     Default: `Hi, this is UBreakiFix. We have your insurance claim and are ready to begin the repair! Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time is 4pm Mon-Sat. `,
     [DEVICE_KEYWORD.Iphone]: `Hi! This is UBreakiFix. We have your insurance claim. Please turn off the setting "Find my iPhone". Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time  is 4pm Mon-Sat.`,
+  },
+  [COMPANIES.AsurionAmazon]: {
+    Default: `Hi, the is uBreakiFix. We have your Asurion Buy Out Claim! Please bring in your device so that we can process your claim. Your old device will remain with us for processing, and your new device will be shipped to you by Amazon!`,
   },
   [COMPANIES.GooglePreferred]: {
     Default: `Hi, this is UBreakiFix. We have your insurance claim and are ready to begin the repair! Phone repairs “usually” take about 3 hours to complete. Same day repair cut off time is 4pm Mon-Sat.`,
