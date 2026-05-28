@@ -33,6 +33,7 @@ const ELEMENT_IDENTIFIERS = {
   NOTE_TEXTAREA: "note-editable",
   NOTE_CONFRIM_ROW_CLASS: ".row.confirm-button",
   CONFIRM_BTN_CLASS: "btn-confirm",
+  DELETE_BTN_CLASS: "btn-delete",
   NOTE_SMS_BTN_CLASS: "lead-create-sms-btn",
   NOTE_EMAIL_BTN_CLASS: "lead-create-email-btn",
 };
