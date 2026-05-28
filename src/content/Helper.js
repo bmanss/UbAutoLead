@@ -222,7 +222,7 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
 
   if (sms && noteSmsButton) {
     noteSmsButton.click();
-    await SetMessageModalText(leadMessage);
+    await SetMessageModalText(leadMessage, true);
 
     createNoteBtn.disabled = false;
     createNoteBtn.click();
@@ -243,10 +243,43 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   return leadSent;
 }
 
-async function SetMessageModalText(text) {
+async function SetMessageModalText(text, isSMS = false) {
   const modalEl = await WaitForElement(ELEMENT_IDENTIFIERS.NOTE_CONTACT_MODAL_ID);
   const messageArea = await WaitForElement("textarea", modalEl, 1000);
   const confirmBtn = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`, modalEl, 1000);
+  const cancelBtn = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.DELETE_BTN_CLASS}"]`, modalEl, 1000);
+
+  // if sms make sure a number is selected
+  if (isSMS) {
+    const phoneNumberSelect = await WaitForElement("select", modalEl, 500);
+
+    if (phoneNumberSelect.options.length < 1) {
+      console.log("No valid phone numbers to send sms.");
+      cancelBtn.click();
+      return;
+    }
+
+    // use first valid phone number
+    let contactNumber = phoneNumberSelect.options[phoneNumberSelect.selectedIndex].text;
+    if (!contactNumber) {
+      for (let i = 0; i < phoneNumberSelect.options.length; i++) {
+        const contactOption = phoneNumberSelect.options[i].text;
+        if (contactOption){
+          contactNumber = contactOption;
+          phoneNumberSelect.selectedIndex = i;
+          phoneNumberSelect.dispatchEvent(new Event("change", { bubbles: true }));
+          break;
+        }
+      }
+    }
+    // if still no valid contact don't try to send sms
+    if (!contactNumber) {
+      console.log("No valid phone numbers to send sms.");
+      cancelBtn.click();
+      return;
+    }
+
+  }
   messageArea.value = text;
   messageArea.dispatchEvent(new Event("input", { bubbles: true }));
   confirmBtn.disabled = false;
