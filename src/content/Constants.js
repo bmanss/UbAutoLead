@@ -89,8 +89,7 @@ const LEAD_MESSAGE = {
     New: `Hello, this is UBreakiFix. We see that we have an appointment for your device. We have a few questions about your device. If possible, contact us at your earliest convenience at 803-520-8285.`,
     Missed: `Hello, this is Ubreakifix. We noticed you have missed the appointment for your device. Please contact us at 803-520-8285 at your earliest convenience to reschedule your appointment.`,
     Default: `Hello this is UBreakiFix. Please give us a call about your device at your earliest convenience at 803-520-8285`,
+    Quote: "Hello, this is UBreakiFix. We have an appointment for your device. The quote for this repair is $[PRICE] before tax. Be sure to stop by or give us a call at your earliest convenience so we can reserve or order parts for you.",
+    PriceMatch: "Here at UbreakiFix we price match! Find a lower price? We'll beat it by $5! This repair also comes with our parts and labor warranty for a full year! Thank you for considering UbreakiFix!"
   },
 };
-
-// --- Quote ---
-// Hello, this is UBreakiFix. We have an appointment for your device. The quote for this repair is $price before tax. Be sure to stop by or give us a call at your earliest convenience so we can reserve or order parts for you.

@@ -109,7 +109,7 @@ function GetDeviceTypeWithKeywords(itemText) {
   }
   return "";
 }
-function GetLeadMessage(deviceType, company, leadStatus) {
+function GetLeadMessage(deviceType, company, quote, leadStatus) {
   let message = "";
   let companyLeads = LEAD_MESSAGE[company];
 
@@ -122,7 +122,7 @@ function GetLeadMessage(deviceType, company, leadStatus) {
   if (company === COMPANIES.None) {
     switch (leadStatus) {
       case LEAD_STATUS.NeedContact:
-        message = companyLeads.New;
+        message = quote ? LEAD_MESSAGE[COMPANIES.None].Quote.replace(`[PRICE]`, quote) : companyLeads.New;
         break;
       case LEAD_STATUS.Missed:
         message = companyLeads.Missed;
@@ -167,7 +167,7 @@ function SetLeadStatus(noteContainer, statusName) {
   }
   return false;
 }
-async function CreateLeadNote(deviceType, company, sms = true, email = true) {
+async function CreateLeadNote(deviceType, company, quote, sms = true, email = true) {
   ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
 
   const leadSent = { sms: false, email: false };
@@ -185,7 +185,7 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   }
 
   const leadStatus = await GetLeadStatus(notesEl);
-  const leadMessage = GetLeadMessage(deviceType, company, leadStatus);
+  const leadMessage = GetLeadMessage(deviceType, company, quote, leadStatus);
 
   if (!leadMessage) {
     console.log("unable to create note, no valid message");
@@ -221,26 +221,37 @@ async function CreateLeadNote(deviceType, company, sms = true, email = true) {
   SetLeadStatus(notesEl, LEAD_STATUS.AwaitingCustomer);
 
   if (sms && noteSmsButton) {
-    noteSmsButton.click();
-    await SetMessageModalText(leadMessage, true);
-
-    createNoteBtn.disabled = false;
-    createNoteBtn.click();
-    await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
+    await SendCommunication(leadMessage, noteSmsButton, createNoteBtn, true);
+    await WaitForElementChange(createBtn, (el) => el.disabled === true);
     leadSent.sms = true;
   }
 
   if (email && noteEmailButton) {
-    noteEmailButton.click();
-    await SetMessageModalText(leadMessage);
-
-    createNoteBtn.disabled = false;
-    createNoteBtn.click();
+    await SendCommunication(leadMessage, noteEmailButton, createNoteBtn);
     leadSent.email = true;
+  }
+
+  // if quote sent, also send price match
+  if (company == COMPANIES.None && quote) {
+    await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
+    
+    if (sms && noteSmsButton) 
+      await SendCommunication(LEAD_MESSAGE[COMPANIES.None].PriceMatch, noteSmsButton, createNoteBtn, true);
+
+    if (email && noteEmailButton) 
+      await SendCommunication(LEAD_MESSAGE[COMPANIES.None].PriceMatch, noteEmailButton, createNoteBtn);
   }
 
   await ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
   return leadSent;
+}
+
+async function SendCommunication(message, commBtn, createBtn, isSms = false) {
+  commBtn.click();
+  await SetMessageModalText(message, isSms);
+
+  createBtn.disabled = false;
+  createBtn.click();
 }
 
 async function SetMessageModalText(text, isSMS = false) {
@@ -264,7 +275,7 @@ async function SetMessageModalText(text, isSMS = false) {
     if (!contactNumber) {
       for (let i = 0; i < phoneNumberSelect.options.length; i++) {
         const contactOption = phoneNumberSelect.options[i].text;
-        if (contactOption){
+        if (contactOption) {
           contactNumber = contactOption;
           phoneNumberSelect.selectedIndex = i;
           phoneNumberSelect.dispatchEvent(new Event("change", { bubbles: true }));
@@ -278,7 +289,6 @@ async function SetMessageModalText(text, isSMS = false) {
       cancelBtn.click();
       return;
     }
-
   }
   messageArea.value = text;
   messageArea.dispatchEvent(new Event("input", { bubbles: true }));
@@ -289,6 +299,14 @@ async function SetMessageModalText(text, isSMS = false) {
 function TryQuerySelector(parent, selector) {
   const element = parent?.querySelector(selector) ?? null;
   return { Success: element != null, Element: element };
+}
+
+async function WaitForLoadingBar(){
+  const loadingBar = await WaitForElement(ELEMENT_IDENTIFIERS.LOADING_BAR, document, 250);
+
+  if (loadingBar) {
+    await WaitForElementRemoved(loadingBar);
+  }
 }
 
 function WaitForElement(selector, parent = document, timeout = 5000) {
