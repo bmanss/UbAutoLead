@@ -222,7 +222,7 @@ async function CreateLeadNote(deviceType, company, quote, sms = true, email = tr
 
   if (sms && noteSmsButton) {
     await SendCommunication(leadMessage, noteSmsButton, createNoteBtn, true);
-    await WaitForElementChange(createBtn, (el) => el.disabled === true);
+    await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
     leadSent.sms = true;
   }
 
@@ -234,11 +234,13 @@ async function CreateLeadNote(deviceType, company, quote, sms = true, email = tr
   // if quote sent, also send price match
   if (company == COMPANIES.None && quote) {
     await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
-    
-    if (sms && noteSmsButton) 
-      await SendCommunication(LEAD_MESSAGE[COMPANIES.None].PriceMatch, noteSmsButton, createNoteBtn, true);
 
-    if (email && noteEmailButton) 
+    if (sms && noteSmsButton) {
+      await SendCommunication(LEAD_MESSAGE[COMPANIES.None].PriceMatch, noteSmsButton, createNoteBtn, true);
+      await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
+    }
+
+    if (email && noteEmailButton)
       await SendCommunication(LEAD_MESSAGE[COMPANIES.None].PriceMatch, noteEmailButton, createNoteBtn);
   }
 
@@ -301,7 +303,7 @@ function TryQuerySelector(parent, selector) {
   return { Success: element != null, Element: element };
 }
 
-async function WaitForLoadingBar(){
+async function WaitForLoadingBar() {
   const loadingBar = await WaitForElement(ELEMENT_IDENTIFIERS.LOADING_BAR, document, 250);
 
   if (loadingBar) {
