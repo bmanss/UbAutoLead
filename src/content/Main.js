@@ -1,75 +1,92 @@
-Main();
-
-let autoCompleteInProgress = false;
-let quotePrice;
+const STATE = {
+  autoCompletElementsnProgress: false,
+  quotePrice: "",
+  lastUrl: location.href,
+};
 
 function Main() {
-  let lastUrl = location.href;
-
-  // Run on initial load
   OnPageChange();
+  WatchForUrlChange();
+}
 
-  // Watch for URL changes
+
+function WatchForUrlChange() {
   const observer = new MutationObserver(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      OnPageChange();
-    }
+    if (location.href === STATE.lastUrl) return;
+    STATE.lastUrl = location.href;
+    OnPageChange();
   });
+
   observer.observe(document.body, { childList: true, subtree: true });
+  return observer;
 }
 
-function InjectElements() {
-  const apptEl = document.querySelector(ELEMENT_IDENTIFIERS.APPOINTMENT);
-
-  if (!apptEl) return;
-
-  // Don't inject if already there
-  if (document.querySelector(".Quick-Lead-Button")) return;
-  const btn = document.createElement("button");
-  btn.className = "Quick-Lead-Button";
-  btn.textContent = "Auto Lead";
-  btn.addEventListener("click", AutoCompleteLead);
-  apptEl.insertAdjacentElement("afterend", btn);
-
-  const company = ParseCustomerInfo().company;
-
-  // inject quote input
-  if (company === COMPANIES.None) {
-    const input = document.createElement("input");
-    input.className = "Quote-Input";
-    input.placeholder = "Quote";
-    input.addEventListener("input", (e) => (quotePrice = e.target.value.trim()));
-    btn.insertAdjacentElement("afterend", input);
-  }
-}
-async function AutoCompleteLead() {
-  if (autoCompleteInProgress) return;
-
-  autoCompleteInProgress = true;
-
-  // wait for page initial load;
-  await WaitForLoadingBar();
-
-  console.log(`Auto complete initiated`);
-  await EnableCommunication();
-
-  const company = ParseCustomerInfo().company;
-  const deviceType = await GetDeviceType();
-
-  const leadSent = await CreateLeadNote(deviceType, company, quotePrice);
-  console.log(`Auto complete finished. Sms sent:${leadSent.sms}, email sent:${leadSent.email}`);
-  autoCompleteInProgress = false;
+function IsLeadPage() {
+  return location.href.includes(Elements.LEADS_URL_PATH);
 }
 
 async function OnPageChange() {
-  if (!location.href.includes("lead-management/leads/edit")) {
+  if (!IsLeadPage()) return;
+
+  const apptEl = await WaitForElement(Elements.APPOINTMENT);
+  if (!apptEl) {
+    console.log("Failed to find appointment element");
     return;
   }
+
+  InjectElements(apptEl);
+}
+
+function InsertAfter(anchor, tagName, props = {}) {
+  const element = Object.assign(document.createElement(tagName), props);
+  anchor.insertAdjacentElement("afterend", element);
+  return element;
+}
+
+function InjectElements(apptEl) {
+  if (!apptEl) return false;
+
+  // Don't inject if already there
+  if (Query(document, Elements.QUICK_LEAD_BTN_CLASS)) return false;
+
+  const leadBtn = InsertAfter(apptEl, "button", {
+    className: Elements.QUICK_LEAD_BTN_NAME,
+    textContent: "Auto Lead",
+    onclick: AutoCompleteLead,
+  });
+
+  // Quote input only applies when there's no company on the lead.
+  if (ParseCustomerInfo().company === COMPANIES.None) {
+    InsertAfter(leadBtn, "input", {
+      className: Elements.QUOTE_INPUT_NAME,
+      placeholder: "Quote",
+      oninput: (e) => (STATE.quotePrice = e.target.value.trim()),
+    });
+  }
+
+  return true;
+}
+
+async function AutoCompleteLead() {
+  if (STATE.autoCompletElementsnProgress) return;
+  STATE.autoCompletElementsnProgress = true;
+
   try {
-    await WaitForElement(ELEMENT_IDENTIFIERS.APPOINTMENT);
-    InjectElements();
-  } catch (e) {
-    console.log("Failed to find appointment element:", e);
+    await WaitForLoadingBar();
+    console.log("Auto complete initiated");
+
+    await EnableCommunication();
+
+    const { company } = ParseCustomerInfo();
+    const deviceType = await GetDeviceType();
+
+    const leadSent = await CreateLeadNote(deviceType, company, STATE.quotePrice);
+    console.log(`Auto complete finished. Sms sent:${leadSent.sms}, email sent:${leadSent.email}`);
+  } catch (error) {
+    console.log("Auto complete failed:", error);
+  } finally {
+    STATE.autoCompletElementsnProgress = false;
   }
 }
+
+Main();

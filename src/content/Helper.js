@@ -1,187 +1,358 @@
-function ParseCustomerInfo() {
-  const [nameEl, phoneEl, emailEl] = document.getElementsByClassName("customer-detail");
-  const companyEl = TryQuerySelector(document, ".company.customer-detail");
+const Elements = ELEMENT_IDENTIFIERS;
 
-  const [cxName, cxID] = nameEl?.querySelector(".details")?.textContent?.trim().split(" - ") ?? null;
+/** Builds a partial class-name selector, e.g. ClassContains("btn-confirm"). */
+function ClassContains(className) {
+  return `[class*="${className}"]`;
+}
+
+/** Builds a [name="..."] selector. */
+function NameSelector(name) {
+  return `[name="${name}"]`;
+}
+
+/** Single element or null. Safe against a null/missing parent. */
+function Query(parent, selector) {
+  return parent?.querySelector?.(selector) ?? null;
+}
+
+/** Always an array, never a live NodeList. */
+function QueryAll(parent, selector) {
+  return Array.from(parent?.querySelectorAll?.(selector) ?? []);
+}
+
+/** Result-object form, kept for callers that branch on Success. */
+function TryQuerySelector(parent, selector) {
+  const element = Query(parent, selector);
+  return { Success: element !== null, Element: element };
+}
+
+/** Options of a <select> as an array, so no caller has to touch .options. */
+function QueryOptions(selectEl) {
+  return Array.from(selectEl?.options ?? []);
+}
+
+function QuerySelectedOption(selectEl) {
+  return QueryOptions(selectEl)[selectEl?.selectedIndex] ?? null;
+}
+
+/** Trimmed text of any node, or null. */
+function GetText(element) {
+  const text = element?.textContent?.trim();
+  return text ? text : null;
+}
+
+/** Trimmed text of the `.details` value inside a detail row, or null. */
+function GetDetailValue(rowElement) {
+  return GetText(Query(rowElement, Elements.DETAIL_VALUE_CLASS));
+}
+
+/** Sets a checkbox and notifies the framework. Returns true if it changed. */
+function SetCheckbox(element, checked) {
+  if (!element || element.checked === checked) return false;
+  element.checked = checked;
+  element.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+/** Sets an input/textarea value and notifies the framework. */
+function SetInputValue(element, value) {
+  if (!element) return false;
+  element.value = value;
+  element.dispatchEvent(new Event("input", { bubbles: true }));
+  return true;
+}
+
+/** Selects an option by index and notifies the framework. */
+function SetSelectedIndex(selectEl, index) {
+  if (!selectEl) return false;
+  selectEl.selectedIndex = index;
+  selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+/** Clicks a button even if the framework has it disabled. */
+function ForceClick(button) {
+  if (!button) return false;
+  button.disabled = false;
+  button.click();
+  return true;
+}
+
+function WaitForElement(selector, parent = document, timeout = TIMEOUTS.Default) {
+  return new Promise((resolve) => {
+    if (!parent) return resolve(null);
+
+    const existing = Query(parent, selector);
+    if (existing) return resolve(existing);
+
+    const observer = new MutationObserver(() => {
+      const element = Query(parent, selector);
+      if (element) {
+        clearTimeout(timer);
+        observer.disconnect();
+        resolve(element);
+      }
+    });
+
+    observer.observe(parent === document ? document.body : parent, { childList: true, subtree: true });
+
+    const timer = setTimeout(() => {
+      observer.disconnect();
+      resolve(null);
+    }, timeout);
+  });
+}
+
+function WaitForElementChange(element, checkFn, timeout = TIMEOUTS.Default) {
+  return new Promise((resolve) => {
+    if (!element) return resolve(null);
+    if (checkFn(element)) return resolve(element);
+
+    const observer = new MutationObserver(() => {
+      if (checkFn(element)) {
+        clearTimeout(timer);
+        observer.disconnect();
+        resolve(element);
+      }
+    });
+
+    observer.observe(element, { attributes: true, childList: true, subtree: true, characterData: true });
+
+    const timer = setTimeout(() => {
+      observer.disconnect();
+      resolve(null);
+    }, timeout);
+  });
+}
+
+function WaitForElementRemoved(element, timeout = TIMEOUTS.Default) {
+  return new Promise((resolve) => {
+    if (!element || !element.isConnected) return resolve(true);
+
+    const observer = new MutationObserver(() => {
+      if (!element.isConnected) {
+        clearTimeout(timer);
+        observer.disconnect();
+        resolve(true);
+      }
+    });
+
+    observer.observe(element.parentNode ?? document.body, { childList: true, subtree: true });
+
+    const timer = setTimeout(() => {
+      observer.disconnect();
+      resolve(false);
+    }, timeout);
+  });
+}
+
+async function WaitForLoadingBar() {
+  const loadingBar = await WaitForElement(Elements.LOADING_BAR, document, TIMEOUTS.Instant);
+  if (loadingBar) await WaitForElementRemoved(loadingBar);
+}
+
+/** Waits for a button to become disabled, which is how this app signals "submitted". */
+function WaitForButtonDisabled(button) {
+  return WaitForElementChange(button, (el) => el.disabled === true);
+}
+
+/* ----------------------------------------------------------------------------
+ * 2. Side panel
+ * --------------------------------------------------------------------------*/
+
+async function ToggleSidePanel(panelType) {
+  const sideButtonClass = Elements.SIDE_BUTTIONS_CLASS[panelType];
+  if (!sideButtonClass) {
+    console.log(`Unknown side panel type: ${panelType}`);
+    return false;
+  }
+
+  const sidePanelEl = await WaitForElement(Elements.SIDE_BUTTONS_PANEL);
+  const sideButton = await WaitForElement(sideButtonClass, sidePanelEl, TIMEOUTS.Short);
+  if (!sideButton) return false;
+
+  sideButton.click();
+  return true;
+}
+
+/**
+ * Opens a side panel and waits for its content. The panel occasionally comes up
+ * empty, so one retry (close + reopen) is built in.
+ */
+async function OpenSidePanel(panelType, contentSelector) {
+  await ToggleSidePanel(panelType);
+
+  const content = await WaitForElement(contentSelector);
+  if (content) return content;
+
+  await ToggleSidePanel(panelType);
+  return await WaitForElement(contentSelector);
+}
+
+/* ----------------------------------------------------------------------------
+ * 3. Customer
+ * --------------------------------------------------------------------------*/
+
+const CUSTOMER_NAME_ID_SEPARATOR = " - ";
+
+function ParseCustomerInfo() {
+  const [nameEl, phoneEl, emailEl] = QueryAll(document, Elements.CUSTOMER_DETAIL_ITEM_CLASS);
+  const companyEl = Query(document, Elements.CUSTOMER_COMPANY_CLASS);
+
+  const [rawName = "", customerId = ""] = (GetDetailValue(nameEl) ?? "").split(CUSTOMER_NAME_ID_SEPARATOR);
+
   return {
-    name: cxName.replaceAll("-", ""),
-    phone: phoneEl?.querySelector(".details")?.textContent?.trim() ?? null,
-    email: emailEl?.querySelector(".details")?.textContent?.trim() ?? null,
-    company: companyEl.Element?.querySelector(".details")?.textContent?.trim() ?? COMPANIES.None,
+    name: rawName.replaceAll("-", "").trim(),
+    id: customerId.trim() || null,
+    phone: GetDetailValue(phoneEl),
+    email: GetDetailValue(emailEl),
+    company: GetDetailValue(companyEl) ?? COMPANIES.None,
   };
 }
 
 async function EnableCommunication(enableSMS = true, enableEmail = true) {
-  await ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
+  const cxDetailsEl = await OpenSidePanel(Elements.SIDE_BUTTIONS.Customer, Elements.CUSTOMER_DETAILS);
+  if (!cxDetailsEl) return false;
 
-  let cxDetailsEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
+  const prefCommEl = await WaitForElement(Elements.CUSTOMER_CONTACT_PREFS_CLASS, cxDetailsEl);
+  const saveBtn = await WaitForElement(Elements.CUSTOMER_DETAILS_SAVE_BTN_CLASS, cxDetailsEl);
+  if (!prefCommEl || !saveBtn) return false;
 
-  if (!cxDetailsEl) {
-    // Try toggling again
-    await ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
-    cxDetailsEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS);
-    if (!cxDetailsEl) return;
-  }
+  const smsCheckBox = Query(prefCommEl, NameSelector(Elements.CUSTOMER_CONTACT_PREF_NAMES.Sms));
+  const emailCheckBox = Query(prefCommEl, NameSelector(Elements.CUSTOMER_CONTACT_PREF_NAMES.Email));
 
-  const prefCommEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_CONTACT_PREFS_CLASS, cxDetailsEl);
-  if (!prefCommEl) return;
-
-  const saveBtn = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DETAILS_SAVE_BTN_CLASS, cxDetailsEl);
-  if (!saveBtn) return;
-
-  const smsCheckBox = TryQuerySelector(prefCommEl, `[name="${ELEMENT_IDENTIFIERS.CUSTOMER_CONTACT_PREF_NAMES.Sms}"]`);
-  const emailCheckBox = TryQuerySelector(prefCommEl, `[name="${ELEMENT_IDENTIFIERS.CUSTOMER_CONTACT_PREF_NAMES.Email}"]`);
-
-  if (enableSMS && smsCheckBox.Success) {
-    smsCheckBox.Element.checked = 1;
-    smsCheckBox.Element.dispatchEvent(new Event("change"));
-  }
-
-  if (enableEmail && emailCheckBox.Success) {
-    emailCheckBox.Element.checked = 1;
-    emailCheckBox.Element.dispatchEvent(new Event("change"));
-  }
+  if (enableSMS) SetCheckbox(smsCheckBox, true);
+  if (enableEmail) SetCheckbox(emailCheckBox, true);
 
   saveBtn.click();
-  // ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Customer);
+  return true;
 }
 
-async function ToggleSidePanel(panelType) {
-  const sidePanelEl = await WaitForElement(ELEMENT_IDENTIFIERS.SIDE_BUTTONS_PANEL);
-  if (!sidePanelEl) return;
+/* ----------------------------------------------------------------------------
+ * 4. Device
+ * --------------------------------------------------------------------------*/
 
-  const panelTypeValid = Object.keys(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS_CLASS).includes(panelType);
-  const sideBtnClass = ELEMENT_IDENTIFIERS.SIDE_BUTTIONS_CLASS[panelType];
-
-  if (!panelTypeValid) return;
-
-  const sideButtonEl = TryQuerySelector(sidePanelEl, sideBtnClass);
-
-  if (sideButtonEl.Success) sideButtonEl.Element.click();
+function GetDeviceTypeWithKeywords(text) {
+  const haystack = (text ?? "").toLowerCase();
+  for (const value of Object.values(DEVICE_KEYWORD)) {
+    if (haystack.includes(value.toLowerCase())) return value;
+  }
+  return "";
 }
 
-async function GetDeviceType() {
-  let deviceType = "";
-
-  const deviceInfoEl = await WaitForElement(ELEMENT_IDENTIFIERS.CUSTOMER_DEVICE_CLASS);
+/** Reads the device row in the customer device panel. */
+async function GetDeviceTypeFromDetails() {
+  const deviceInfoEl = await WaitForElement(Elements.CUSTOMER_DEVICE_CLASS);
   if (!deviceInfoEl) return "";
 
-  const deviceDetails = deviceInfoEl.querySelectorAll(ELEMENT_IDENTIFIERS.DEVICE_DETAIL_ITEM_CLASS);
-
-  for (const detail of deviceDetails) {
-    const label = detail.querySelector("label")?.textContent?.trim();
-    if (label.toLowerCase().includes("device")) {
-      deviceType = detail.querySelector(".details")?.textContent?.trim()?.toLowerCase() ?? "";
-      break;
-    }
-  }
-
-  deviceType = GetDeviceTypeWithKeywords(deviceType);
-
-  if (!!deviceType) return deviceType;
-
-  const itemList = document.querySelector(ELEMENT_IDENTIFIERS.ITEM_LIST);
-  const itemTableBody = itemList.querySelector("tbody");
-
-  if (!itemTableBody) return deviceType;
-
-  for (const row of itemTableBody.querySelectorAll("tr")) {
-    if (row.classList.contains("animate-show")) continue;
-
-    const rowData = row.querySelectorAll("td");
-    if (!rowData || rowData.length < 3) continue;
-
-    const item = rowData[2];
-    const itemText = item.textContent.toLowerCase();
-
-    deviceType = GetDeviceTypeWithKeywords(itemText);
-
-    if (!!deviceType) return deviceType;
-  }
-  return deviceType;
-}
-
-function GetDeviceTypeWithKeywords(itemText) {
-  for (const [key, value] of Object.entries(DEVICE_KEYWORD)) {
-    if (itemText.includes(value.toLowerCase())) {
-      return value;
+  for (const detail of QueryAll(deviceInfoEl, Elements.DEVICE_DETAIL_ITEM_CLASS)) {
+    const label = GetText(Query(detail, Elements.DETAIL_LABEL))?.toLowerCase() ?? "";
+    if (label.includes(Elements.DEVICE_LABEL_KEYWORD)) {
+      return GetDetailValue(detail)?.toLowerCase() ?? "";
     }
   }
   return "";
 }
+
+/** Falls back to scanning the sale item list for a device keyword. */
+function GetDeviceTypeFromItems() {
+  const itemList = Query(document, Elements.ITEM_LIST);
+  const itemTableBody = Query(itemList, Elements.TABLE_BODY);
+  if (!itemTableBody) return "";
+
+  for (const row of QueryAll(itemTableBody, Elements.TABLE_ROW)) {
+    if (row.classList.contains(Elements.ITEM_ROW_IGNORE_CLASS)) continue;
+
+    const cells = QueryAll(row, Elements.TABLE_CELL);
+    if (cells.length < Elements.ITEM_ROW_MIN_COLUMNS) continue;
+
+    const deviceType = GetDeviceTypeWithKeywords(GetText(cells[Elements.ITEM_NAME_COLUMN_INDEX]));
+    if (deviceType) return deviceType;
+  }
+  return "";
+}
+
+async function GetDeviceType() {
+  const fromDetails = GetDeviceTypeWithKeywords(await GetDeviceTypeFromDetails());
+  return fromDetails || GetDeviceTypeFromItems();
+}
+
+/* ----------------------------------------------------------------------------
+ * 5. Leads & notes
+ * --------------------------------------------------------------------------*/
+
 function GetLeadMessage(deviceType, company, quote, leadStatus) {
-  let message = "";
-  let companyLeads = LEAD_MESSAGE[company];
+  const companyLeads = LEAD_MESSAGE[company] ?? LEAD_MESSAGE[COMPANIES.None];
 
-  if (!companyLeads) {
+  if (!LEAD_MESSAGE[company]) {
     console.log(`Company:${company} has no valid lead messages, defaulting to no company.`);
-    companyLeads = LEAD_MESSAGE[COMPANIES.None];
   }
 
-  // No company
-  if (company === COMPANIES.None) {
-    switch (leadStatus) {
-      case LEAD_STATUS.NeedContact:
-        message = quote ? LEAD_MESSAGE[COMPANIES.None].Quote.replace(`[PRICE]`, quote) : companyLeads.New;
-        break;
-      case LEAD_STATUS.Missed:
-        message = companyLeads.Missed;
-        break;
-      default:
-        message = companyLeads.Default;
-        break;
-    }
-  }
-  // Company lead awaiting contact
-  else if (leadStatus === LEAD_STATUS.NeedContact) {
-    message = companyLeads[deviceType] ?? companyLeads.Default;
+  if (company !== COMPANIES.None) {
+    return leadStatus === LEAD_STATUS.NeedContact ? companyLeads[deviceType] ?? companyLeads.Default : "";
   }
 
-  return message;
+  switch (leadStatus) {
+    case LEAD_STATUS.NeedContact:
+      return quote ? companyLeads.Quote.replace("[PRICE]", quote) : companyLeads.New;
+    case LEAD_STATUS.Missed:
+      return companyLeads.Missed;
+    default:
+      return companyLeads.Default;
+  }
 }
 
 async function GetLeadStatus(noteContainer) {
-  const leadStatusEl = await WaitForElement("select", noteContainer);
+  const leadStatusEl = await WaitForElement(Elements.SELECT, noteContainer);
   if (!leadStatusEl) return "";
 
   // Wait until an option is actually selected with valid text
-  await WaitForElementChange(leadStatusEl, (el) => {
-    const opt = el.options[el.selectedIndex];
-    return opt && opt.textContent.trim().length > 0;
-  });
+  await WaitForElementChange(leadStatusEl, (el) => !!GetText(QuerySelectedOption(el)));
 
-  const selectedOption = leadStatusEl.options[leadStatusEl.selectedIndex];
-  return selectedOption?.textContent?.trim() ?? "";
+  return GetText(QuerySelectedOption(leadStatusEl)) ?? "";
 }
 
 function SetLeadStatus(noteContainer, statusName) {
-  const selectEl = noteContainer.querySelector("select");
+  const selectEl = Query(noteContainer, Elements.SELECT);
   if (!selectEl) return false;
 
-  for (const option of selectEl.options) {
-    if (option.textContent.trim() === statusName) {
-      selectEl.value = option.value;
-      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
-    }
-  }
-  return false;
-}
-async function CreateLeadNote(deviceType, company, quote, sms = true, email = true) {
-  ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
+  const index = QueryOptions(selectEl).findIndex((option) => GetText(option) === statusName);
+  if (index < 0) return false;
 
+  return SetSelectedIndex(selectEl, index);
+}
+
+/** Collects everything CreateLeadNote needs, or null if the panel isn't usable. */
+async function GetNoteControls(notesEl) {
+  const confirmRow = await WaitForElement(Elements.NOTE_CONFRIM_ROW_CLASS, notesEl, 2000);
+  const createBtn = await WaitForElement(ClassContains(Elements.CONFIRM_BTN_CLASS), confirmRow, 2000);
+  if (!createBtn) {
+    console.log("create note button not found");
+    return null;
+  }
+
+  const commHoldEl = await WaitForElement(Elements.NOTE_COMM_BTN_HOLD_CLASS, notesEl);
+  if (!commHoldEl) {
+    console.log(`unable to create note, ${Elements.NOTE_COMM_BTN_HOLD_CLASS} not found`);
+    return null;
+  }
+
+  const smsBtn = await WaitForElement(ClassContains(Elements.NOTE_SMS_BTN_CLASS), commHoldEl, TIMEOUTS.Short);
+  const emailBtn = await WaitForElement(ClassContains(Elements.NOTE_EMAIL_BTN_CLASS), commHoldEl, TIMEOUTS.Short);
+
+  if (!smsBtn) console.log("sms button not found");
+  if (!emailBtn) console.log("email button not found");
+
+  return { createBtn, smsBtn, emailBtn };
+}
+
+async function CreateLeadNote(deviceType, company, quote, sms = true, email = true) {
   const leadSent = { sms: false, email: false };
 
-  // Wait for notes panel to actually appear
-  let notesEl = await WaitForElement(ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
-
+  const notesEl = await OpenSidePanel(Elements.SIDE_BUTTIONS.Notes, Elements.CREATE_NOTE_ID);
   if (!notesEl) {
-    ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
-    notesEl = await WaitForElement(ELEMENT_IDENTIFIERS.CREATE_NOTE_ID);
-    if (!notesEl) {
-      console.log("unable to create note, could not find elements");
-      return leadSent;
-    }
+    console.log("unable to create note, could not find elements");
+    return leadSent;
   }
 
   const leadStatus = await GetLeadStatus(notesEl);
@@ -193,186 +364,81 @@ async function CreateLeadNote(deviceType, company, quote, sms = true, email = tr
     return leadSent;
   }
 
-  const createNoteContainer = await WaitForElement(ELEMENT_IDENTIFIERS.NOTE_CONFRIM_ROW_CLASS, notesEl, 2000);
-  const createNoteBtn = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`, createNoteContainer, 2000);
-
-  // Wait for diag-hold (sms/email button container) to be ready
-  const diagHoldEl = await WaitForElement(".diag-hold", notesEl);
-  if (!diagHoldEl) {
-    console.log("unable to create note, diag-hold not found");
-    return leadSent;
-  }
-
-  if (!createNoteBtn) {
-    console.log("create note button not found");
-    return leadSent;
-  }
-
-  const noteSmsButton = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.NOTE_SMS_BTN_CLASS}"]`, diagHoldEl, 1000);
-  const noteEmailButton = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.NOTE_EMAIL_BTN_CLASS}"]`, diagHoldEl, 1000);
-
-  if (!noteSmsButton) {
-    console.log(`sms button note found`);
-  }
-  if (!noteEmailButton) {
-    console.log(`sms button note found`);
-  }
+  const controls = await GetNoteControls(notesEl);
+  if (!controls) return leadSent;
 
   SetLeadStatus(notesEl, LEAD_STATUS.AwaitingCustomer);
 
-  if (sms && noteSmsButton) {
-    await SendCommunication(leadMessage, noteSmsButton, createNoteBtn, true);
-    await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
-    leadSent.sms = true;
+  leadSent.sms = await TrySendCommunication(sms, leadMessage, controls.smsBtn, controls.createBtn, true);
+  leadSent.email = await TrySendCommunication(email, leadMessage, controls.emailBtn, controls.createBtn);
+
+  // If a quote went out, follow it with the price match message.
+  if (company === COMPANIES.None && quote) {
+    await WaitForButtonDisabled(controls.createBtn);
+    const priceMatch = LEAD_MESSAGE[COMPANIES.None].PriceMatch;
+
+    await TrySendCommunication(sms, priceMatch, controls.smsBtn, controls.createBtn, true);
+    await TrySendCommunication(email, priceMatch, controls.emailBtn, controls.createBtn);
   }
 
-  if (email && noteEmailButton) {
-    await SendCommunication(leadMessage, noteEmailButton, createNoteBtn);
-    leadSent.email = true;
-  }
-
-  // if quote sent, also send price match
-  if (company == COMPANIES.None && quote) {
-    await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
-
-    if (sms && noteSmsButton) {
-      await SendCommunication(LEAD_MESSAGE[COMPANIES.None].PriceMatch, noteSmsButton, createNoteBtn, true);
-      await WaitForElementChange(createNoteBtn, (el) => el.disabled === true);
-    }
-
-    if (email && noteEmailButton)
-      await SendCommunication(LEAD_MESSAGE[COMPANIES.None].PriceMatch, noteEmailButton, createNoteBtn);
-  }
-
-  await ToggleSidePanel(ELEMENT_IDENTIFIERS.SIDE_BUTTIONS.Notes);
+  await ToggleSidePanel(Elements.SIDE_BUTTIONS.Notes);
   return leadSent;
+}
+
+/** Sends one message if enabled and the button exists. Returns whether it sent. */
+async function TrySendCommunication(enabled, message, commBtn, createBtn, isSms = false) {
+  if (!enabled || !commBtn) return false;
+
+  await SendCommunication(message, commBtn, createBtn, isSms);
+  await WaitForButtonDisabled(createBtn);
+  return true;
 }
 
 async function SendCommunication(message, commBtn, createBtn, isSms = false) {
   commBtn.click();
-  await SetMessageModalText(message, isSms);
+  const composed = await SetMessageModalText(message, isSms);
+  if (!composed) return false;
 
-  createBtn.disabled = false;
-  createBtn.click();
+  return ForceClick(createBtn);
 }
 
+/**
+ * Fills in and confirms the contact modal.
+ * Returns false (and cancels the modal) if it can't be completed.
+ */
 async function SetMessageModalText(text, isSMS = false) {
-  const modalEl = await WaitForElement(ELEMENT_IDENTIFIERS.NOTE_CONTACT_MODAL_ID);
-  const messageArea = await WaitForElement("textarea", modalEl, 1000);
-  const confirmBtn = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.CONFIRM_BTN_CLASS}"]`, modalEl, 1000);
-  const cancelBtn = await WaitForElement(`[class*="${ELEMENT_IDENTIFIERS.DELETE_BTN_CLASS}"]`, modalEl, 1000);
+  const modalEl = await WaitForElement(Elements.NOTE_CONTACT_MODAL_ID);
+  if (!modalEl) return false;
 
-  // if sms make sure a number is selected
-  if (isSMS) {
-    const phoneNumberSelect = await WaitForElement("select", modalEl, 500);
+  const messageArea = await WaitForElement(Elements.TEXTAREA, modalEl, TIMEOUTS.Short);
+  const confirmBtn = await WaitForElement(ClassContains(Elements.CONFIRM_BTN_CLASS), modalEl, TIMEOUTS.Short);
+  const cancelBtn = await WaitForElement(ClassContains(Elements.DELETE_BTN_CLASS), modalEl, TIMEOUTS.Short);
 
-    if (phoneNumberSelect.options.length < 1) {
-      console.log("No valid phone numbers to send sms.");
-      cancelBtn.click();
-      return;
-    }
-
-    // use first valid phone number
-    let contactNumber = phoneNumberSelect.options[phoneNumberSelect.selectedIndex].text;
-    if (!contactNumber) {
-      for (let i = 0; i < phoneNumberSelect.options.length; i++) {
-        const contactOption = phoneNumberSelect.options[i].text;
-        if (contactOption) {
-          contactNumber = contactOption;
-          phoneNumberSelect.selectedIndex = i;
-          phoneNumberSelect.dispatchEvent(new Event("change", { bubbles: true }));
-          break;
-        }
-      }
-    }
-    // if still no valid contact don't try to send sms
-    if (!contactNumber) {
-      console.log("No valid phone numbers to send sms.");
-      cancelBtn.click();
-      return;
-    }
+  if (!messageArea || !confirmBtn) {
+    console.log("contact modal is missing its message area or confirm button");
+    cancelBtn?.click();
+    return false;
   }
-  messageArea.value = text;
-  messageArea.dispatchEvent(new Event("input", { bubbles: true }));
-  confirmBtn.disabled = false;
-  confirmBtn.click();
-}
 
-function TryQuerySelector(parent, selector) {
-  const element = parent?.querySelector(selector) ?? null;
-  return { Success: element != null, Element: element };
-}
-
-async function WaitForLoadingBar() {
-  const loadingBar = await WaitForElement(ELEMENT_IDENTIFIERS.LOADING_BAR, document, 250);
-
-  if (loadingBar) {
-    await WaitForElementRemoved(loadingBar);
+  if (isSMS && !(await SelectPhoneNumber(modalEl))) {
+    console.log("No valid phone numbers to send sms.");
+    cancelBtn?.click();
+    return false;
   }
+
+  SetInputValue(messageArea, text);
+  return ForceClick(confirmBtn);
 }
 
-function WaitForElement(selector, parent = document, timeout = 5000) {
-  return new Promise((resolve) => {
-    const el = parent.querySelector(selector);
-    if (el) return resolve(el);
+/** Picks the first option with actual text. Returns true if a number is selected. */
+async function SelectPhoneNumber(modalEl) {
+  const phoneSelect = await WaitForElement(Elements.SELECT, modalEl, TIMEOUTS.Poll);
+  if (!phoneSelect) return false;
 
-    const observer = new MutationObserver(() => {
-      const el = parent.querySelector(selector);
-      if (el) {
-        observer.disconnect();
-        resolve(el);
-      }
-    });
+  if (GetText(QuerySelectedOption(phoneSelect))) return true;
 
-    observer.observe(parent === document ? document.body : parent, { childList: true, subtree: true });
-    setTimeout(() => {
-      observer.disconnect();
-      resolve(null);
-    }, timeout);
-  });
-}
-function WaitForElementChange(element, checkFn, timeout = 5000) {
-  return new Promise((resolve) => {
-    if (checkFn(element)) return resolve(element);
+  const index = QueryOptions(phoneSelect).findIndex((option) => !!GetText(option));
+  if (index < 0) return false;
 
-    const observer = new MutationObserver(() => {
-      if (checkFn(element)) {
-        observer.disconnect();
-        resolve(element);
-      }
-    });
-
-    observer.observe(element, {
-      attributes: true,
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
-    setTimeout(() => {
-      observer.disconnect();
-      resolve(null);
-    }, timeout);
-  });
-}
-
-function WaitForElementRemoved(element, timeout = 5000) {
-  return new Promise((resolve) => {
-    if (!element || !element.isConnected) return resolve(true);
-
-    const observer = new MutationObserver(() => {
-      if (!element.isConnected) {
-        observer.disconnect();
-        resolve(true);
-      }
-    });
-
-    const target = element.parentNode ?? document.body;
-    observer.observe(target, { childList: true, subtree: true });
-
-    setTimeout(() => {
-      observer.disconnect();
-      resolve(false);
-    }, timeout);
-  });
+  return SetSelectedIndex(phoneSelect, index);
 }
